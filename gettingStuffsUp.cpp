@@ -6,7 +6,20 @@
 #include <unistd.h>
 
 #define bType  uint8_t
+
 #define rtcBusAdd 0x68
+#define secondsAdd 0x00
+#define minutesAdd 0x01
+#define hoursAdd 0x02
+#define dayOfWeekAdd 0x03
+#define dateOfMonthAdd 0x04
+#define monthAdd 0x05
+#define yearAdd 0x06
+#define tempMSBAdd 0x11
+#define tempLSBAdd 0x12
+
+#define bit_8 8
+
 using namespace::std;
 
 const string Days[]={"Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"};
@@ -78,7 +91,7 @@ i2c::~i2c(){
 class RTC:public i2c{
 	public:
 	void setDate(int,bType,bType,bType,bType,bType,bType,bType,int);
-	void getTemp();
+	void getTemp(int);
 	int setYear(int ,int, int);
 	int setDayOfWeek(int ,int, int);
 	int setDateOfMonth(int ,int, int);
@@ -96,53 +109,54 @@ class RTC:public i2c{
 	void getDate(int,int);
 };
 int RTC::setSeconds(int bit,int deviceID, int val){
-	return i2c::setRegisterValue(bit,deviceID,0,val);
+	return i2c::setRegisterValue(bit,deviceID,secondsAdd,val);
 }
 int RTC::setMinutes(int bit,int deviceID, int val){
-	return i2c::setRegisterValue(bit,deviceID,1,val);
+	return i2c::setRegisterValue(bit,deviceID,minutesAdd,val);
 }
 int RTC::setHours(int bit,int deviceID, int val){
-	return i2c::setRegisterValue(bit,deviceID,2,val);
+	return i2c::setRegisterValue(bit,deviceID,hoursAdd,val);
 }
 int RTC::setDayOfWeek(int bit,int deviceID, int val){
-	return i2c::setRegisterValue(bit,deviceID,3,val);
+	return i2c::setRegisterValue(bit,deviceID,dayOfWeekAdd,val);
 }
 int RTC::setDateOfMonth(int bit,int deviceID, int val){
-	return i2c::setRegisterValue(bit,deviceID,4,val);
+	return i2c::setRegisterValue(bit,deviceID,dateOfMonthAdd,val);
 }
 int RTC::setMonth(int bit,int deviceID, int val){
-	return i2c::setRegisterValue(bit,deviceID,5,val);
+	return i2c::setRegisterValue(bit,deviceID,monthAdd,val);
 }
 int RTC::setYear(int bit,int deviceID, int val){
-	return i2c::setRegisterValue(bit,deviceID,6,val);
+	return i2c::setRegisterValue(bit,deviceID,yearAdd,val);
 }
 int RTC::getSeconds(int bit, int deviceID){
-	return i2c::getRegisterValue(bit,deviceID, 0);
+	return i2c::getRegisterValue(bit,deviceID, secondsAdd);
 }
 int RTC::getMinutes(int bit, int deviceID){
-	return i2c::getRegisterValue(bit,deviceID, 1);
+	return i2c::getRegisterValue(bit,deviceID, minutesAdd);
 }
 int RTC::getHours(int bit, int deviceID){
-	return i2c::getRegisterValue(bit,deviceID, 2);
+	return i2c::getRegisterValue(bit,deviceID, hoursAdd);
 }
 int RTC::getDayOfWeek(int bit, int deviceID){
-	return i2c::getRegisterValue(bit,deviceID, 3);
+	return i2c::getRegisterValue(bit,deviceID, dayOfWeekAdd);
 }
 int RTC::getDateOfMonth(int bit, int deviceID){
-	return i2c::getRegisterValue(bit,deviceID, 4);
+	return i2c::getRegisterValue(bit,deviceID, dateOfMonthAdd);
 }
 int RTC::getMonth(int bit, int deviceID){
-	return i2c::getRegisterValue(bit,deviceID, 5);
+	return i2c::getRegisterValue(bit,deviceID, monthAdd);
 }
 int RTC::getYear(int bit, int deviceID){
-	return i2c::getRegisterValue(bit,deviceID, 6);
+	return i2c::getRegisterValue(bit,deviceID, yearAdd);
 }
 void RTC::getDate(int bit,int deviceID){
-	while(1){
+	int i=0;
+	while(i< 1){
 		cout<<RTC::getDateOfMonth(bit,deviceID)<<"/"<<RTC::getMonth(bit,deviceID)<<"/"<<RTC::getYear(bit,deviceID)<<"\t";
 		cout<<RTC::getHours(bit,deviceID)<<":"<<RTC::getMinutes(bit,deviceID)<<":"<<RTC::getSeconds(bit,deviceID)<<"\t";
 		cout<<Days[RTC::getDayOfWeek(bit,deviceID)]<<endl;
-		sleep(1);
+		sleep(1);i++;
 	}
 }
 void RTC::setDate( int bit,bType year, bType month, bType dateOfMonth, bType hours, bType minutes, bType seconds, bType dayOfWeek, int deviceID)
@@ -156,23 +170,33 @@ void RTC::setDate( int bit,bType year, bType month, bType dateOfMonth, bType hou
   RTC::setMonth(bit,deviceID,month);
   RTC::setYear(bit,deviceID,year);
 }
+void RTC::getTemp(int deviceID){
+	unsigned char msb= i2c::getRegisterValue(8,deviceID, tempMSBAdd);
+	unsigned char lsb =i2c::getRegisterValue(8,deviceID, tempLSBAdd);
+	cout<<"msb "<<msb<<endl;
+	cout<<"lsb "<<lsb<<endl;
+	//cout<<  msb<<8|lsb;
+	cout<<(float) (msb + (lsb >> 6) * 0.25f)<<endl;
+}
+
 int main(){
-cout<<"Start of the program"<<endl;
+cout<<"Start of the Application:"<<endl;
 RTC ds3231;
 
 int fd = wiringPiI2CSetup(rtcBusAdd);
 int result;
+ds3231.getTemp(fd);
 //bType year, bType month, bType dateOfMonth, bType hours, bType minutes, bType seconds, bType dayOfWeek;
-ds3231.setDate(8,20,03,04,15,49,00,04,fd);
-ds3231.getDate(8,fd);
+ds3231.setDate(bit_8,20,03,04,15,49,00,04,fd);
+ds3231.getDate(bit_8,fd);
 /*for(int i=0;i<60; i++){
 result = ds3231.setSeconds(8,fd,i);
 cout<< result;
 secOP = ds3231.getSeconds(8,fd);
 cout<<"Second is "<<secOP<<endl;
 sleep(1);
-}*/
-/*cout<<"Results:"<<fd<<endl;
+}
+cout<<"Results:"<<fd<<endl;
 for(int i = 0; i < 60; i++)
    {	int result= wiringPiI2CWriteReg8(fd,0,decToBcd(i));
       if(result == -1)
