@@ -8,11 +8,26 @@
 #include<linux/i2c.h>
 #include<linux/i2c-dev.h>
 
-#define I2C_0 "/dev/i2c-0"
-#define I2C_1 "/dev/i2c-1"
+#define _I2C_0 "/dev/i2c-0"
+#define _I2C_1 "/dev/i2c-1"
+#define _I2C0 0
+#define _I2C1 1
+
+#define _rtcBusAdd 0x68
+#define _secondsAdd 0x00
+#define _minutesAdd 0x01
+#define _hoursAdd 0x02
+#define _dayOfWeekAdd 0x03
+#define _dateOfMonthAdd 0x04
+#define _monthAdd 0x05
+#define _yearAdd 0x06
+#define _tempMSBAdd 0x11
+#define _tempLSBAdd 0x12
+
+
 
 using namespace std;
-
+const string Days[]={"Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"};
 #define HEX(x) setw(2) << setfill('0') << hex << (int)(x)
 int bcdToDec(char b) { return (b/16)*10 + (b%16); }
 uint8_t decToBcd(uint8_t decValue) {  
@@ -45,15 +60,14 @@ I2CDevice::I2CDevice(unsigned int bus, unsigned int device) {
 	this->device = device;
 	this->open();
 }
-
 /**
  * Open a connection to an I2C device
  * @return 1 on failure to open to the bus or device, 0 on success.
  */
 int I2CDevice::open(){
    string name;
-   if(this->bus==0) name = I2C_0;
-   else name = I2C_1;
+   if(this->bus==0) name = _I2C_0;
+   else name = _I2C_1;
 
    if((this->file=::open(name.c_str(), O_RDWR)) < 0){
       perror("Failed to open the bus\n");
@@ -166,20 +180,109 @@ I2CDevice::~I2CDevice() {
 	if(file!=-1) this->close();
 }
 
+class DS3231:public I2CDevice{
+unsigned int I2CBus, I2CAddress;
+unsigned char *registers;
+public:
+DS3231(unsigned int I2CBus, unsigned int I2CAddress=0x68);
+int setYear(int);
+int setDayOfWeek(int);
+int setDateOfMonth(int);
+int setHours(int);
+int setSeconds(int);
+int setMinutes(int);
+int setMonth(int);
+int getSeconds();
+int getYear();
+int getDayOfWeek();
+int getDateOfMonth();
+int getHours();
+int getMinutes();
+int getMonth();
+void getDate();
+void getTemp();
+void setDateTime(int,int,int,int,int,int,int);
+virtual ~DS3231();
+};
+DS3231::DS3231(unsigned int I2CBus, unsigned int I2CAddress):
+	I2CDevice(I2CBus, I2CAddress){ 
+	this->I2CAddress = I2CAddress;
+	this->I2CBus = I2CBus;
+}
+int DS3231::setSeconds(int val){
+	return I2CDevice::writeRegister(_secondsAdd,decToBcd(val));
+}
+int DS3231::setMinutes(int val){
+	return I2CDevice::writeRegister(_minutesAdd,decToBcd(val));
+}
+int DS3231::setHours(int val){
+	return I2CDevice::writeRegister(_hoursAdd,decToBcd(val));
+}
+int DS3231::setDayOfWeek(int val){
+	return I2CDevice::writeRegister(_dayOfWeekAdd,decToBcd(val));
+}
+int DS3231::setDateOfMonth(int val){
+	return I2CDevice::writeRegister(_dateOfMonthAdd,decToBcd(val));
+}
+int DS3231::setMonth(int val){
+	return I2CDevice::writeRegister(_monthAdd,decToBcd(val));
+}
+int DS3231::setYear(int val){
+	return I2CDevice::writeRegister(_yearAdd,decToBcd(val));
+}
+int DS3231::getSeconds(){
+	return bcdToDec(I2CDevice::readRegister(_secondsAdd));
+}
+int DS3231::getMinutes(){
+	return bcdToDec(I2CDevice::readRegister(_minutesAdd));
+}
+int DS3231::getHours(){
+	return bcdToDec(I2CDevice::readRegister(_hoursAdd));
+}
+int DS3231::getDayOfWeek(){
+	return bcdToDec(I2CDevice::readRegister(_dayOfWeekAdd));
+}
+int DS3231::getDateOfMonth(){
+	return bcdToDec(I2CDevice::readRegister(_dateOfMonthAdd));
+}
+int DS3231::getMonth(){
+	return bcdToDec(I2CDevice::readRegister(_monthAdd));
+}
+int DS3231::getYear(){
+	return bcdToDec(I2CDevice::readRegister(_yearAdd));
+}
+void DS3231::getDate(){
+	int i=0;
+	while(i< 1){
+		cout<<DS3231::getDateOfMonth()<<"/"<<DS3231::getMonth()<<"/"<<DS3231::getYear()<<"\t";
+		cout<<DS3231::getHours()<<":"<<DS3231::getMinutes()<<":"<<DS3231::getSeconds()<<"\t";
+		cout<<Days[DS3231::getDayOfWeek()]<<endl;
+		sleep(1);i++;
+	}
+}
+void DS3231::setDateTime( int year, int month, int dateOfMonth, int hours, int minutes, int seconds, int dayOfWeek)
+{	 
+  DS3231::setSeconds(seconds);
+  DS3231::setMinutes(minutes);
+  DS3231::setHours(hours);
+  DS3231::setDayOfWeek(dayOfWeek);
+  DS3231::setDateOfMonth(dateOfMonth);
+  DS3231::setMonth(month);
+  DS3231::setYear(year);
+}
+void DS3231::getTemp(){
+	int msb= bcdToDec(I2CDevice::readRegister(_tempMSBAdd));
+	int lsb =bcdToDec(I2CDevice::readRegister(_tempLSBAdd));
+	cout<<"msb "<<msb<<endl;
+	cout<<"lsb "<<lsb<<endl;
+	//cout<<  msb<<8|lsb;
+	cout<<(float) (msb + (lsb >> 6) * 0.25f)<<endl;
+}
+DS3231::~DS3231(){}
 int main(){
-	I2CDevice x(1,0x68);
-	x.writeRegister(0x00,decToBcd(0));
-	x.writeRegister(0x01,decToBcd(35));
-	x.writeRegister(0x02,decToBcd(22));
-	x.writeRegister(0x03,decToBcd(4));
-	x.writeRegister(0x04,decToBcd(5));
-	x.writeRegister(0x05,decToBcd(3));
-	
-	unsigned char* xx = x.readRegisters(7,0);
-	
-	
-	for(int i=0;i<7;i++){
-	cout<<"OP is:"<<bcdToDec(xx[i])<<endl;}
-	x.close();
+	DS3231 rtc1(_I2C1,_rtcBusAdd);
+	rtc1.getTemp();
+	rtc1.setDateTime(20,03,04,15,49,00,04);
+	rtc1.getDate();
 	return 1;
 }
